@@ -1,0 +1,236 @@
+#!/bin/sh
+set -u
+### LOG LEVEL
+# WARN=0 ; INFO=1 ; DEBUG=2 or higher ;)
+LOG_LEVEL=99
+
+if [ $LOG_LEVEL -ge 2 ];then
+	set -x
+fi
+
+# DEFAULTS
+RIP_DEV="/dev/dvd"
+RIP_ATRACK="auto"	# 1
+RIP_VTRACK="auto"	# 1
+RIP_GEO="720:576"	# auto # "720:576"
+RIP_VOL="auto"		# VALUE  / auto
+RIP_LANG="de"		# auto from $LANG
+RIP_OUT="OUTFILE"   # stdout is not working 
+RIP_SUB="off"
+RIP_VBIT="1400"
+RIP_MP3OPT="abr:preset=standard" # all but vol=
+
+TMPFILE="/tmp/clirper.$$"
+
+# options
+### -i interactive
+### -s subtitle	( off / LANG )
+# -g geometry	( 720:576 )
+# -m mp3opts	( preset=medium /preset=standard / abr:br=190 / cbr:br=128 )
+function help {
+	echo "
+	-h | --help			this help
+	-d | --device		the device file [$RIP_DEV]
+	-t | --track		the movie track [$RIP_VTRACK]
+	-a | --audiotrack	the audio track [$RIP_ATRACK]
+	-l | --language		the language code [$RIP_LANG]
+	-b | --bitrate		the video bitrate [$RIP_VBIT]
+	-g | --geometry		the video scaling [$RIP_GEO]
+	-v | --volume		the audio volume [$RIP_VOL]
+	-m | --mp3opts		the options for the lame mp3-encoder [$RIP_MP3OPT]
+	-o | --outfile		the movie filename [$RIP_OUT]
+	"
+}
+
+#LITTLE HELPERS
+function FORMATER {
+	echo "$@"
+}
+function DEBUG {
+	test $LOG_LEVEL -ge 2 && \
+		FORMATER  "DEBUG: $@"
+}
+function INFO {
+	test $INFO -ge 1 && \
+		FORMATER "INFO: $@"
+}
+function WARN {
+	test $WARN -ge 0 && \
+		FORMATER "WARN: $@"
+}
+function ERROR {
+	echo "ERROR $@" >&2
+}
+function FATAL {
+	echo "FATAL $@" >&2
+	exit 1
+}
+
+# GETOPT 
+TEMP=`getopt \
+	-o D,h,i,d:,t:,l:,s:,o:,b:,g:,v:,m:a: \
+	-l \
+		debug,help,interactive,device:,track:,language:,subtitle:,outfile:,bitrate:,geometry:,volume:,mp3opts:,audiotrack: \
+	-n 'shrip options' -- "$@"`
+
+if [ $? != 0 ]; then FATAL "Terminating ... " ; fi
+eval set -- "$TEMP"
+
+while true; do 
+	case "$1" in
+			-D|--debug)
+				set -x
+				set -u
+				DEBUG=2
+				shift;;
+			-h|--help)
+				help
+				exit 1;;
+			-i|--interactive)
+				INTERACTIVE=1
+				shift;;
+			-d|--device)
+				DEBUG "device $2"
+				RIP_DEV="$2"
+				shift 2;;
+			-t|--track)
+				DEBUG "track $2"
+				RIP_VTRACK="$2"
+				shift 2;;
+			-l|--language)
+				DEBUG "language $2"
+				RIP_LANG="$2"
+				shift 2;;
+			-s|--subtitle)
+				DEBUG "subtitle $2"
+				RIP_SUB="$2"
+				shift 2;;
+			-o|--outfile)
+				DEBUG "outfile $2"
+				RIP_OUT="$2"
+				shift 2;;
+			-b|--bitrate)
+				DEBUG "bitrate $2"
+				RIP_VBIT="$2"
+				shift 2;;
+			-g|--geometry)
+				DEBUG "geometry $2"
+				RIP_GEO="$2"
+				shift 2;;
+			-v|--volume)
+				DEBUG "volume $2"
+				RIP_VOL="$2"
+				shift 2;;
+			-m|--mp3opts)
+				DEBUG "mp3opts $2"
+				RIP_MP3OPT="$2"
+				shift 2;;
+			-a|--audiotrack)
+				DEBUG "audiotrack $2"
+				RIP_ATRACK="$2"
+				shift 2;;
+			--) shift; break;;
+			*)
+				FATAL "internal error!" 
+				;;
+		esac
+done
+
+# RIP_DEV="${RIP_DEV:=/dev/dvd}"
+# RIP_VTRACK="${RIP_VTRACK:=1}"		#auto
+# RIP_GEO="${RIP_GEO:=720:576}"		#auto
+# RIP_VOL="${RIP_VOL:=2}"			#auto
+# RIP_LANG="${RIP_LANG:=de}"		#auto
+# RIP_OUT="${RIP_OUT:=-}"
+# RIP_SUB="${RIP_SUB:=off}"
+# RIP_VBIT="${RIP_VBIT:=1400}"
+# RIP_MP3OPT="${RIP_MP3OPT:=preset=standard}"
+
+INFO "OPTIONS DONE"
+
+function GET_VTRACK {
+	if [ "$RIP_VTRACK" = "auto" ]; then
+		lsdvd -av > ${TMPFILE} 2>&1
+		_VTRACK=`grep -i "Longest track" ${TMPFILE} | cut -d: -f2`
+		_VTRACK="`expr $_VTRACK \* 1`"
+		DEBUG "found longest track: $_VTRACK"
+	else
+		_VTRACK=$RIP_VTRACK
+		DEBUG "longest track via parameter: $_VTRACK"
+	fi
+	return "$_VTRACK"
+}
+
+function GET_ATRACK {
+	if [ "$RIP_ATRACK" = "auto" ]; then
+		lsdvd -av -t ${_VTRACK} > ${TMPFILE}.${_VTRACK} 2>&1
+		_ATRACK=`grep "Language: ${RIP_LANG} - " ${TMPFILE}.${_VTRACK} | cut -d, -f1 | cut -d: -f2`
+		DEBUG "found language track $_ATRACK"
+	else
+		_ATRACK=$RIP_ATRACK
+		DEBUG "audio track hast number $_ATRACK"
+	fi
+	if [ "`echo $_ATRACK | wc -w`" -ne 1 ]; then
+		FATAL "getting audio track failed... please choose manually"
+	fi	
+	return $_ATRACK
+}
+
+function GET_GEO {
+	if [ "$RIP_GEO" = "auto" ]; then
+		grep  Width ${TMPFILE}.${_VTRACK}
+		grep  Height ${TMPFILE}.${_VTRACK}
+		FATAL "FIXME - scanning for geometry is not yet implemented "
+	else
+		_GEO=$RIP_GEO
+		DEBUG "geometry is set to $_GEO"
+	fi
+}
+
+function SCAN {
+	if [ "$RIP_VOL" = "auto" ]; then
+		INFO "ermitteln der Lautstaerke - das kann dauern..."
+		INFO "Kaffee, Tee, etc... "
+		tccat -t dvd -T ${_VTRACK},-1,1 -i ${RIP_DEV} | tcextract -a ${_ATRACK} -x ac3 -t vob | tcdecode -x ac3 | tcscan -x pcm > ${TMPFILE}.SCAN
+		# tcscan] (min/max) amplitude=(-0.238/0.259), suggested volume rescale=3.868
+		_VOL=`grep "suggested volume rescale=" ${TMPFILE}.SCAN | cut -d' ' -f 6 | cut -d= -f2`
+	else
+		_VOL=$RIP_VOL
+	fi
+}
+
+function RIP {
+	_MENCODER="mencoder \
+		dvd://${_VTRACK}		\
+		-ovc xvid				\
+		-vf scale=${_GEO}		\
+		-slang ${RIP_SUB}		\
+		-alang ${RIP_LANG}			\
+		-oac mp3lame			\
+		-xvidencopts bitrate=${RIP_VBIT}	\
+		-lameopts ${RIP_MP3OPT}:vol=${_VOL}	\
+		-o ${RIP_OUT}"
+	INFO "encoding movie now... using the following command line:"
+	INFO $_MENCODER
+	INFO "this may take a while... get yourself a book and a drink and enjoy some spare time"
+	exec $_MENCODER
+}
+
+GET_VTRACK
+INFO VTRACK $_VTRACK
+
+GET_ATRACK
+INFO ATRACK $_ATRACK
+
+GET_GEO
+INFO GEO $_GEO
+
+SCAN
+INFO SCAN $_VOL
+
+
+RIP
+INFO DONE
+
+rm ${TMPFILE} ${TMPFILE}.*
+
