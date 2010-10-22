@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 set -u
 ### LOG LEVEL
 # WARN=0 ; INFO=1 ; DEBUG=2 or higher ;)
-LOG_LEVEL=99
+LOG_LEVEL=0
 
 if [ $LOG_LEVEL -ge 2 ];then
 	set -x
@@ -44,7 +44,8 @@ function help {
 
 #LITTLE HELPERS
 function FORMATER {
-	echo "$@"
+	DATETIME=`date +%F_-_%T`
+	echo "$DATETIME $@"
 }
 function DEBUG {
 	test $LOG_LEVEL -ge 2 && \

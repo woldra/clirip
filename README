@@ -1,0 +1,13 @@
+clirip
+command line tool to rip and encode movies on the fly
+
+The basic idea behind clirip is to have one command to get the ripped and encoded movie file on the harddisk. 
+No worry about temporary files, no additional diskspace needed...
+
+It is a quite simple shell script that uses mencoder and transcode.
+transcode command lines are little more than just inspired by dvd::rip - thank god for Free software
+
+You can try if your satisfied with the default settings - you just need to specify the output with -o /path/to/movie.avi
+Please see --help for more
+
+
