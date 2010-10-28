@@ -29,16 +29,18 @@ TMPFILE="/tmp/clirper.$$"
 # -m mp3opts	( preset=medium /preset=standard / abr:br=190 / cbr:br=128 )
 function help {
 	echo "
-	-h | --help			this help
-	-d | --device		the device file [$RIP_DEV]
-	-t | --track		the movie track [$RIP_VTRACK]
-	-a | --audiotrack	the audio track [$RIP_ATRACK]
-	-l | --language		the language code [$RIP_LANG]
-	-b | --bitrate		the video bitrate [$RIP_VBIT]
-	-g | --geometry		the video scaling [$RIP_GEO]
-	-v | --volume		the audio volume [$RIP_VOL]
-	-m | --mp3opts		the options for the lame mp3-encoder [$RIP_MP3OPT]
-	-o | --outfile		the movie filename [$RIP_OUT]
+	-h | --help         this help
+	-d | --device       the device file [$RIP_DEV]
+	-t | --track        the movie track [$RIP_VTRACK]
+	-a | --audiotrack   the audio track [$RIP_ATRACK]
+	-l | --language     the language code [$RIP_LANG]
+	-b | --bitrate      the video bitrate [$RIP_VBIT]
+	-g | --geometry     the video scaling [$RIP_GEO]
+	-v | --volume       the audio volume [$RIP_VOL]
+	-m | --mp3opts      the options for the lame mp3-encoder [$RIP_MP3OPT]
+	-o | --outfile      the movie filename [$RIP_OUT]
+
+	for more information refer to documentation or the source
 	"
 }
 
@@ -52,11 +54,11 @@ function DEBUG {
 		FORMATER  "DEBUG: $@"
 }
 function INFO {
-	test $INFO -ge 1 && \
+	test $LOG_LEVEL -ge 1 && \
 		FORMATER "INFO: $@"
 }
 function WARN {
-	test $WARN -ge 0 && \
+	test $LOG_LEVEL -ge 0 && \
 		FORMATER "WARN: $@"
 }
 function ERROR {
