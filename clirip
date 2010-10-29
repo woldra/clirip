@@ -15,7 +15,7 @@ RIP_VTRACK="auto"	# 1
 RIP_GEO="720:576"	# auto # "720:576"
 RIP_VOL="auto"		# VALUE  / auto
 RIP_LANG="de"		# auto from $LANG
-RIP_OUT="OUTFILE"   # stdout is not working 
+RIP_OUT="auto"      # stdout is not working 
 RIP_SUB="off"
 RIP_VBIT="1400"
 RIP_MP3OPT="abr:preset=standard" # all but vol=
@@ -151,6 +151,17 @@ done
 
 INFO "OPTIONS DONE"
 
+function GET_DISKTITLE {
+	if [ "$RIP_OUT" = "auto" ]; then
+		_DTITLE="`lsdvd | grep -i 'Disc Title:' | cut -d: -f2 `"
+		_DTITLE="`echo $_DTITLE`.avi"
+		DEBUG "found disk title: $_DTITLE"
+	else
+		_DTITLE="$RIP_OUT"
+		DEBUG "disk title via parameter: $_DTITLE"
+	fi
+}
+
 function GET_VTRACK {
 	if [ "$RIP_VTRACK" = "auto" ]; then
 		lsdvd -av > ${TMPFILE} 2>&1
@@ -212,12 +223,15 @@ function RIP {
 		-oac mp3lame			\
 		-xvidencopts bitrate=${RIP_VBIT}	\
 		-lameopts ${RIP_MP3OPT}:vol=${_VOL}	\
-		-o ${RIP_OUT}"
+		-o ${_DTITLE}"
 	INFO "encoding movie now... using the following command line:"
 	INFO $_MENCODER
 	INFO "this may take a while... get yourself a book and a drink and enjoy some spare time"
 	exec $_MENCODER
 }
+
+GET_DISKTITLE
+INFO DISKTITLE $_DTITLE
 
 GET_VTRACK
 INFO VTRACK $_VTRACK
